@@ -19,6 +19,8 @@
 
     Once you have your key (it starts with "AIza"), replace the "google_maps_key"
     string in this file.
+
+    possible new API key for googleApi? : 705561954990-34sj63oaogdjfoi56piheqij9g6hk4gf.apps.googleusercontent.com
     -->
     <string name="google_maps_key" templateMergeStrategy="preserve" translatable="false">AIzaSyCGyjtzn2ZgJ6UdYjDThR9vDiIraiKA4_E</string>
 </resources>
