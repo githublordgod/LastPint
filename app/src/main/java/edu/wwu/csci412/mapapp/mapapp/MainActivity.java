@@ -17,4 +17,9 @@ public class MainActivity extends AppCompatActivity {
         Intent i = new Intent(this, MapsActivity.class);
         this.startActivity(i);
     }
+
+    public void contacts(View v) {
+        Intent i = new Intent(this, ContactList.class);
+        this.startActivity(i);
+    }
 }
