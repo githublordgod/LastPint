@@ -1,6 +1,7 @@
 package edu.wwu.csci412.mapapp.mapapp;
 
 import android.content.Context;
+import android.graphics.Color;
 import android.support.v7.widget.AppCompatButton;
 
 public class ContactButton extends AppCompatButton {
@@ -9,9 +10,11 @@ public class ContactButton extends AppCompatButton {
     public ContactButton(Context context, Contact c) {
         super(context);
         contact = c;
+        setBackground(getResources().getDrawable(R.drawable.button_background));
+        setTextColor(Color.WHITE);
     }
 
     public int getId() { return contact.getId(); }
 
-    public String toString() { return contact.getName() + " - " + contact.getPhone(); }
+    public String toString() { return contact.getName(); }
 }

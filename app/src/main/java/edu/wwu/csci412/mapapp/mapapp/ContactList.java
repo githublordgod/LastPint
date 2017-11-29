@@ -1,8 +1,13 @@
 package edu.wwu.csci412.mapapp.mapapp;
 
+import android.Manifest;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.telephony.SmsManager;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
@@ -81,13 +86,13 @@ public class ContactList extends AppCompatActivity {
                             Toast.makeText(ContactList.this, "Contact erased", Toast.LENGTH_SHORT).show();
                             update();
                             break;
-                        default:
+                        case R.id.m_help:
+                            sendHelp();
                             break;
                     }
                     return true;
                 }
             });
-
             popup.show();
         }
     }
@@ -95,5 +100,42 @@ public class ContactList extends AppCompatActivity {
     public void add(View v) {
         Intent i = new Intent(this, AddContact.class);
         this.startActivity(i);
+    }
+
+    public void sendHelp() {
+        if (ContextCompat.checkSelfPermission(this,
+                Manifest.permission.SEND_SMS)
+                != PackageManager.PERMISSION_GRANTED) {
+            if (ActivityCompat.shouldShowRequestPermissionRationale(this,
+                    Manifest.permission.SEND_SMS)) {
+            } else {
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.SEND_SMS},0);
+            }
+        } else trueSendHelp();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
+        switch (requestCode) {
+            case 0: {
+                if (grantResults.length > 0
+                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    trueSendHelp();
+                } else {
+                    Toast.makeText(getApplicationContext(),
+                            "SMS failed, please try again.", Toast.LENGTH_LONG).show();
+                    return;
+                }
+            }
+        }
+    }
+
+    void trueSendHelp() {
+        SmsManager smsManager = SmsManager.getDefault();
+        String phone = db.select(currentId).getPhone();
+        smsManager.sendTextMessage(phone, null, getString(R.string.helpmsg), null, null);
+        Toast.makeText(getApplicationContext(), "SMS sent.",
+                Toast.LENGTH_LONG).show();
     }
 }

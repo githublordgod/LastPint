@@ -1,4 +1,5 @@
 <resources>
-    <string name="app_name">MapApp</string>
+    <string name="app_name">My Last Pint</string>
     <string name="title_activity_maps">Map</string>
+    <string name="helpmsg">send help</string>
 </resources>
