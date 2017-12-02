@@ -54,6 +54,7 @@
         android:layout_height="wrap_content"
         android:layout_marginStart="84dp"
         android:text="Name:"
+        android:textSize="18sp"
         app:layout_constraintBottom_toTopOf="@+id/name"
         app:layout_constraintStart_toStartOf="parent" />
 
@@ -63,6 +64,7 @@
         android:layout_height="wrap_content"
         android:layout_marginStart="84dp"
         android:text="Phone #:"
+        android:textSize="18sp"
         app:layout_constraintBottom_toTopOf="@+id/phone"
         app:layout_constraintStart_toStartOf="parent" />
 </android.support.constraint.ConstraintLayout>
