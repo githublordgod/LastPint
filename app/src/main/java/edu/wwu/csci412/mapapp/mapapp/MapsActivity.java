@@ -14,6 +14,8 @@ package edu.wwu.csci412.mapapp.mapapp;
         import android.support.v4.app.FragmentActivity;
         import android.os.Bundle;
         import android.support.v4.content.ContextCompat;
+        import android.telephony.SmsManager;
+        import android.util.Log;
         import android.widget.Toast;
 
         import com.google.android.gms.common.ConnectionResult;
@@ -21,6 +23,12 @@ package edu.wwu.csci412.mapapp.mapapp;
         import com.google.android.gms.location.LocationListener;
         import com.google.android.gms.location.LocationRequest;
         import com.google.android.gms.location.LocationServices;
+        import com.google.android.gms.location.places.GeoDataClient;
+        import com.google.android.gms.location.places.Place;
+        import com.google.android.gms.location.places.PlaceDetectionClient;
+        import com.google.android.gms.location.places.PlaceLikelihood;
+        import com.google.android.gms.location.places.PlaceLikelihoodBufferResponse;
+        import com.google.android.gms.location.places.Places;
         import com.google.android.gms.maps.CameraUpdateFactory;
         import com.google.android.gms.maps.GoogleMap;
         import com.google.android.gms.maps.OnMapReadyCallback;
@@ -29,6 +37,11 @@ package edu.wwu.csci412.mapapp.mapapp;
         import com.google.android.gms.maps.model.LatLng;
         import com.google.android.gms.maps.model.Marker;
         import com.google.android.gms.maps.model.MarkerOptions;
+        import com.google.android.gms.tasks.OnCompleteListener;
+        import com.google.android.gms.tasks.Task;
+
+        import java.util.ArrayList;
+        import java.util.List;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback,
         GoogleApiClient.ConnectionCallbacks,
@@ -40,6 +53,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     LocationRequest mLocationRequest;
     Location mLastLocation;
     Marker  mCurrLocationMarker;
+    PlaceDetectionClient mPlaceDetectionClient;
+    GeoDataClient mGeoDataClient;
+    Place current;
+    private Database db;
+    public static final int MY_PERMISSIONS_REQUEST_SMS = 98;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -53,6 +71,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
+
+        mGeoDataClient = Places.getGeoDataClient(this, null);
+
+        // Construct a PlaceDetectionClient.
+        mPlaceDetectionClient = Places.getPlaceDetectionClient(this, null);
+
     }
 
 
@@ -137,8 +161,64 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mMap.animateCamera(CameraUpdateFactory.zoomTo(11));
 
         //stop location updates
-        if (mGoogleApiClient != null) {
-            LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, this);
+        //if (mGoogleApiClient != null) {
+        //    LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, this);
+        //}
+        try {
+            Task<PlaceLikelihoodBufferResponse> placeResult = mPlaceDetectionClient.getCurrentPlace(null);
+            Task<PlaceLikelihoodBufferResponse> placeLikelihoodBufferResponseTask = placeResult.addOnCompleteListener(new OnCompleteListener<PlaceLikelihoodBufferResponse>() {
+                @Override
+                public void onComplete(@NonNull Task<PlaceLikelihoodBufferResponse> task) {
+                    PlaceLikelihoodBufferResponse likelyPlaces = task.getResult();
+                    for (PlaceLikelihood placeLikelihood : likelyPlaces) {
+
+                        Place p = placeLikelihood.getPlace();
+                        List<Integer> types = p.getPlaceTypes();
+                        for (Integer i : types) {
+                            if (i == Place.TYPE_BAR || i == Place.TYPE_LIQUOR_STORE) {
+                                Log.i("", "bar");
+                                mMap.addMarker(new MarkerOptions().position(p.getLatLng()).title((String) p.getName()));
+                                float j = 0;
+                                if (placeLikelihood.getLikelihood() > 0.5 && placeLikelihood.getLikelihood() > j) {
+                                    Log.i("", p.getName() + " is the current place");
+                                    j = placeLikelihood.getLikelihood();
+                                    helpReq(p);
+                                }
+                            }
+                        }
+
+                        Log.i("", String.format("Place '%s' has likelihood: %g",
+                                p.getName(),
+                                placeLikelihood.getLikelihood()));
+                    }
+                    likelyPlaces.release();
+                }
+            });
+        } catch (SecurityException e) {
+            Log.i("", "Permission error.");
+        }
+
+    }
+
+    void helpReq(Place p) {
+        Log.i("", "requesting help from " + p.getName());
+        if (ContextCompat.checkSelfPermission(this,
+                Manifest.permission.SEND_SMS)
+                != PackageManager.PERMISSION_GRANTED) {
+            if (ActivityCompat.shouldShowRequestPermissionRationale(this,
+                    Manifest.permission.SEND_SMS)) {
+            } else {
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.SEND_SMS},0);
+            }
+        } else {
+            SmsManager smsManager = SmsManager.getDefault();
+            ArrayList<Contact> contacts = db.selectAll();
+            String phone = contacts.get(0).getPhone();
+            Log.i("","sending to " + phone);
+            smsManager.sendTextMessage(phone, null, getString(R.string.helpmsg), null, null);
+            Toast.makeText(getApplicationContext(), "SMS sent.",
+                    Toast.LENGTH_LONG).show();
         }
     }
 
@@ -201,6 +281,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     Toast.makeText(this, "permission denied", Toast.LENGTH_LONG).show();
                 }
                 return;
+            }
+            case MY_PERMISSIONS_REQUEST_SMS: {
+                if (grantResults.length > 0
+                        && grantResults[0] == PackageManager.PERMISSION_GRANTED
+                        && current != null) {
+                    helpReq(current);
+                }
             }
 
             // other 'case' lines to check for other permissions this app might request.
