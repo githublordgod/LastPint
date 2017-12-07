@@ -14,7 +14,8 @@
         android:layout_marginStart="8dp"
         android:layout_marginTop="164dp"
         android:onClick="map"
-        android:text="View Map"
+        android:text="View Map / Arm"
+        android:background="@drawable/button_background"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
@@ -28,6 +29,7 @@
         android:layout_marginStart="8dp"
         android:onClick="contacts"
         android:text="Contact List"
+        android:background="@drawable/button_background"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />

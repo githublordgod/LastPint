@@ -16,6 +16,8 @@ package edu.wwu.csci412.mapapp.mapapp;
         import android.support.v4.content.ContextCompat;
         import android.telephony.SmsManager;
         import android.util.Log;
+        import android.view.View;
+        import android.widget.TextView;
         import android.widget.Toast;
 
         import com.google.android.gms.common.ConnectionResult;
@@ -42,11 +44,15 @@ package edu.wwu.csci412.mapapp.mapapp;
 
         import java.util.ArrayList;
         import java.util.List;
+        import java.util.Timer;
+        import java.util.TimerTask;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback,
         GoogleApiClient.ConnectionCallbacks,
         GoogleApiClient.OnConnectionFailedListener,
         LocationListener{
+
+    private final int CLOCK_SECONDS = 30;
 
     private GoogleMap mMap;
     GoogleApiClient mGoogleApiClient;
@@ -58,6 +64,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     Place current;
     private Database db;
     public static final int MY_PERMISSIONS_REQUEST_SMS = 98;
+    Timer clock;
+    TimerTask sec;
+    int seconds;
+    String display;
+    TextView tv;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -66,6 +77,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         if(android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){
             checkLocationPermission();
+            //checkSMSPermission();
         }
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
@@ -76,7 +88,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         // Construct a PlaceDetectionClient.
         mPlaceDetectionClient = Places.getPlaceDetectionClient(this, null);
-
+        db = new Database(this);
+        current = null;
+        clock = new Timer();
+        tv = findViewById(R.id.clock);
+        seconds = CLOCK_SECONDS;
     }
 
 
@@ -121,8 +137,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     @Override
     public void onConnected(@Nullable Bundle bundle) {
         mLocationRequest = new LocationRequest();
-        mLocationRequest.setInterval(1000);
-        mLocationRequest.setFastestInterval(1000);
+        mLocationRequest.setInterval(1000*60*2);
+        mLocationRequest.setFastestInterval(1000*60);
         mLocationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
         if (ContextCompat.checkSelfPermission(this,
                 Manifest.permission.ACCESS_FINE_LOCATION)
@@ -174,19 +190,33 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
                         Place p = placeLikelihood.getPlace();
                         List<Integer> types = p.getPlaceTypes();
+                        float j = 0;
                         for (Integer i : types) {
                             if (i == Place.TYPE_BAR || i == Place.TYPE_LIQUOR_STORE) {
                                 Log.i("", "bar");
                                 mMap.addMarker(new MarkerOptions().position(p.getLatLng()).title((String) p.getName()));
-                                float j = 0;
-                                if (placeLikelihood.getLikelihood() > 0.5 && placeLikelihood.getLikelihood() > j) {
-                                    Log.i("", p.getName() + " is the current place");
+                                String id = "";
+                                if (current != null) id = current.getId();
+                                if (placeLikelihood.getLikelihood() > 0.5 && placeLikelihood.getLikelihood() > j && !p.getId().equals(id)) {
+                                    Log.i("", p.getName() + " is the new current place");
                                     j = placeLikelihood.getLikelihood();
-                                    helpReq(p);
+                                    current = p.freeze();
+                                    sec = new TimerTask() {
+                                        @Override
+                                        public void run() {
+                                            seconds--;
+                                            display = String.format("" + seconds / 60 + ":%02d", seconds % 60);
+                                            updateClock(display);
+                                            if (seconds <= 0) {
+                                                seconds = CLOCK_SECONDS;
+                                                helpReq();
+                                            }
+                                        }
+                                    };
+                                    clock.scheduleAtFixedRate(sec, 1000, 1000);
                                 }
                             }
                         }
-
                         Log.i("", String.format("Place '%s' has likelihood: %g",
                                 p.getName(),
                                 placeLikelihood.getLikelihood()));
@@ -200,8 +230,21 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     }
 
-    void helpReq(Place p) {
-        Log.i("", "requesting help from " + p.getName());
+    void updateClock(final String display) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                ((TextView) findViewById(R.id.clock)).setText(display);
+            }
+        });
+    }
+
+    void helpReq() {
+        if (current == null) {
+            displayToast("SMS cancelled.");
+            return;
+        }
+        Log.i("", "requesting help from " + current.getName());
         if (ContextCompat.checkSelfPermission(this,
                 Manifest.permission.SEND_SMS)
                 != PackageManager.PERMISSION_GRANTED) {
@@ -217,34 +260,37 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             String phone = contacts.get(0).getPhone();
             Log.i("","sending to " + phone);
             smsManager.sendTextMessage(phone, null, getString(R.string.helpmsg), null, null);
-            Toast.makeText(getApplicationContext(), "SMS sent.",
-                    Toast.LENGTH_LONG).show();
+            displayToast("SMS sent");
         }
+    }
+
+    public void disarm(View v) {
+        current = null;
+        sec.cancel();
+        seconds = CLOCK_SECONDS;
+        helpReq();
+    }
+
+    public void displayToast(final String str) {
+        runOnUiThread(new Runnable() {
+            public void run() {
+                Toast.makeText(MapsActivity.this, str, Toast.LENGTH_LONG).show();
+            }
+        });
     }
 
     //requests user permission one-by-one at runtime
     public static final int MY_PERMISSIONS_REQUEST_LOCATION = 99;
-    public boolean checkLocationPermission(){
+    public boolean checkLocationPermission() {
         if (ContextCompat.checkSelfPermission(this,
                 Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED) {
-
-            // Asking user if explanation is needed
             if (ActivityCompat.shouldShowRequestPermissionRationale(this,
                     Manifest.permission.ACCESS_FINE_LOCATION)) {
-
-                // Show an expanation to the user *asynchronously* -- don't block
-                // this thread waiting for the user's response! After the user
-                // sees the explanation, try again to request the permission.
-
-                //Prompt the user once explanation has been shown
                 ActivityCompat.requestPermissions(this,
                         new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
                         MY_PERMISSIONS_REQUEST_LOCATION);
-
-
             } else {
-                // No explanation needed, we can request the permission.
                 ActivityCompat.requestPermissions(this,
                         new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
                         MY_PERMISSIONS_REQUEST_LOCATION);
@@ -278,7 +324,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 } else {
 
                     // Permission denied, Disable the functionality that depends on this permission.
-                    Toast.makeText(this, "permission denied", Toast.LENGTH_LONG).show();
+                    Toast.makeText(this, "Location permission denied", Toast.LENGTH_LONG).show();
                 }
                 return;
             }
@@ -286,12 +332,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 if (grantResults.length > 0
                         && grantResults[0] == PackageManager.PERMISSION_GRANTED
                         && current != null) {
-                    helpReq(current);
+                    helpReq();
                 }
             }
-
-            // other 'case' lines to check for other permissions this app might request.
-            //You can add here other case statements according to your requirement.
         }
     }
 }

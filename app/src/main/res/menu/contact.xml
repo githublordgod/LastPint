@@ -2,12 +2,12 @@
     xmlns:tools="http://schemas.android.com/tools"
     tools:context="edu.wwu.csci412.mapapp.mapapp.ContactList">
     <item
+        android:id="@+id/m_help"
+        android:title="Request help" />
+    <item
         android:id="@+id/m_edit"
         android:title="Edit" />
     <item
         android:id="@+id/m_delete"
         android:title="Delete" />
-    <item
-        android:id="@+id/m_help"
-        android:title="Request help" />
 </menu>

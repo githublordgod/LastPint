@@ -3,11 +3,14 @@ package edu.wwu.csci412.mapapp.mapapp;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.PorterDuff;
+import android.os.Build;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.telephony.SmsManager;
+import android.util.Log;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
@@ -20,6 +23,7 @@ import android.widget.Toast;
 import java.util.ArrayList;
 
 public class ContactList extends AppCompatActivity {
+    private static final int SMS_PERM = 1;
 
     private Database db;
     private ScrollView sv;
@@ -32,6 +36,10 @@ public class ContactList extends AppCompatActivity {
 
         db = new Database(this);
         sv = findViewById(R.id.sv);
+        currentId = 0;
+        if(android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){
+            checkSMSPermission();
+        }
         update();
     }
 
@@ -53,6 +61,7 @@ public class ContactList extends AppCompatActivity {
             int i = 0;
             for (Contact c : list) {
                 contacts[i] = new ContactButton(this, c);
+                if (i == 0) contacts[i].getBackground().setColorFilter(0xBB00BB00, PorterDuff.Mode.MULTIPLY);
                 contacts[i].setText(contacts[i].toString());
                 contacts[i].setOnClickListener(h);
                 grid.addView(contacts[i], GridLayout.LayoutParams.MATCH_PARENT, GridLayout.LayoutParams.WRAP_CONTENT);
@@ -87,7 +96,8 @@ public class ContactList extends AppCompatActivity {
                             update();
                             break;
                         case R.id.m_help:
-                            sendHelp();
+                            Toast.makeText(ContactList.this, "Requesting help...", Toast.LENGTH_SHORT).show();
+                            checkPerms();
                             break;
                     }
                     return true;
@@ -102,32 +112,63 @@ public class ContactList extends AppCompatActivity {
         this.startActivity(i);
     }
 
-    public void sendHelp() {
-        if (ContextCompat.checkSelfPermission(this,
+    public void checkPerms() {
+        if (currentId != 0) {
+            Log.i("","sending to " + db.select(currentId).getPhone());
+            trueSendHelp();
+        }
+    }
+
+    public void checkSMSPermission() {
+        // Here, thisActivity is the current activity
+        if (ContextCompat.checkSelfPermission(ContactList.this,
                 Manifest.permission.SEND_SMS)
                 != PackageManager.PERMISSION_GRANTED) {
-            if (ActivityCompat.shouldShowRequestPermissionRationale(this,
+
+            // Should we show an explanation?
+            if (ActivityCompat.shouldShowRequestPermissionRationale(ContactList.this,
                     Manifest.permission.SEND_SMS)) {
+
+                // Show an explanation to the user *asynchronously* -- don't block
+                // this thread waiting for the user's response! After the user
+                // sees the explanation, try again to request the permission.
+
             } else {
-                ActivityCompat.requestPermissions(this,
-                        new String[]{Manifest.permission.SEND_SMS},0);
+
+                // No explanation needed, we can request the permission.
+
+                ActivityCompat.requestPermissions(ContactList.this,
+                        new String[]{Manifest.permission.SEND_SMS},
+                        SMS_PERM);
+
+                // MY_PERMISSIONS_REQUEST_READ_CONTACTS is an
+                // app-defined int constant. The callback method gets the
+                // result of the request.
             }
-        } else trueSendHelp();
+        }
     }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
         switch (requestCode) {
-            case 0: {
+            case SMS_PERM: {
+                // If request is cancelled, the result arrays are empty.
                 if (grantResults.length > 0
                         && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    trueSendHelp();
+
+                    // permission was granted, yay! Do the
+                    // contacts-related task you need to do.
+                    Toast.makeText(ContactList.this, "Permission cleared.", Toast.LENGTH_SHORT).show();
+
                 } else {
-                    Toast.makeText(getApplicationContext(),
-                            "SMS failed, please try again.", Toast.LENGTH_LONG).show();
-                    return;
+
+                    // permission denied, boo! Disable the
+                    // functionality that depends on this permission.
+                    Toast.makeText(ContactList.this, "Permission denied.", Toast.LENGTH_SHORT).show();
                 }
+                return;
             }
+
         }
     }
 
