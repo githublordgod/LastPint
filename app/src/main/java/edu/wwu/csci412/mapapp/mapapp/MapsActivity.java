@@ -257,10 +257,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         } else {
             SmsManager smsManager = SmsManager.getDefault();
             ArrayList<Contact> contacts = db.selectAll();
-            String phone = contacts.get(0).getPhone();
-            Log.i("","sending to " + phone);
-            smsManager.sendTextMessage(phone, null, getString(R.string.helpmsg), null, null);
-            displayToast("SMS sent");
+            for (Contact c : contacts) {
+                String phone = c.getPhone();
+                Log.i("","sending to " + phone);
+                smsManager.sendTextMessage(phone, null, getString(R.string.helpmsg), null, null);
+            }
+            displayToast("Mass SMS sent");
         }
     }
 

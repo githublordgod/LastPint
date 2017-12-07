@@ -61,7 +61,7 @@ public class ContactList extends AppCompatActivity {
             int i = 0;
             for (Contact c : list) {
                 contacts[i] = new ContactButton(this, c);
-                if (i == 0) contacts[i].getBackground().setColorFilter(0xBB00BB00, PorterDuff.Mode.MULTIPLY);
+                //contacts[i].getBackground().setColorFilter(0xBBBBBB00, PorterDuff.Mode.MULTIPLY);
                 contacts[i].setText(contacts[i].toString());
                 contacts[i].setOnClickListener(h);
                 grid.addView(contacts[i], GridLayout.LayoutParams.MATCH_PARENT, GridLayout.LayoutParams.WRAP_CONTENT);
@@ -134,20 +134,17 @@ public class ContactList extends AppCompatActivity {
                 // sees the explanation, try again to request the permission.
 
             } else {
-
                 // No explanation needed, we can request the permission.
 
                 ActivityCompat.requestPermissions(ContactList.this,
                         new String[]{Manifest.permission.SEND_SMS},
                         SMS_PERM);
-
                 // MY_PERMISSIONS_REQUEST_READ_CONTACTS is an
                 // app-defined int constant. The callback method gets the
                 // result of the request.
             }
         }
     }
-
     @Override
     public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
         switch (requestCode) {
@@ -168,7 +165,6 @@ public class ContactList extends AppCompatActivity {
                 }
                 return;
             }
-
         }
     }
 
