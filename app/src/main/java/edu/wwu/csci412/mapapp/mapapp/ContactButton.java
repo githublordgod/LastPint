@@ -11,7 +11,6 @@ public class ContactButton extends AppCompatButton {
         super(context);
         contact = c;
         setBackground(getResources().getDrawable(R.drawable.button_background));
-        setTextColor(Color.WHITE);
     }
 
     public int getId() { return contact.getId(); }

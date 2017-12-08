@@ -61,7 +61,6 @@ public class ContactList extends AppCompatActivity {
             int i = 0;
             for (Contact c : list) {
                 contacts[i] = new ContactButton(this, c);
-                //contacts[i].getBackground().setColorFilter(0xBBBBBB00, PorterDuff.Mode.MULTIPLY);
                 contacts[i].setText(contacts[i].toString());
                 contacts[i].setOnClickListener(h);
                 grid.addView(contacts[i], GridLayout.LayoutParams.MATCH_PARENT, GridLayout.LayoutParams.WRAP_CONTENT);
@@ -73,9 +72,6 @@ public class ContactList extends AppCompatActivity {
 
     private class ButtonHandler implements View.OnClickListener {
         public void onClick(View v) {
-            /*db.delete(v.getId());
-            Toast.makeText(ContactList.this, "Contact erased", Toast.LENGTH_SHORT).show();
-            update();*/
             PopupMenu popup = new PopupMenu(ContactList.this, v);
             MenuInflater inflater = popup.getMenuInflater();
             inflater.inflate(R.menu.contact, popup.getMenu());

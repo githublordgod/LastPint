@@ -5,6 +5,7 @@
 
 package edu.wwu.csci412.mapapp.mapapp;
         import android.Manifest;
+        import android.content.Intent;
         import android.content.pm.PackageManager;
         import android.location.Location;
         import android.os.Build;
@@ -52,7 +53,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         GoogleApiClient.OnConnectionFailedListener,
         LocationListener{
 
-    private final int CLOCK_SECONDS = 30;
+    private final int CLOCK_SECONDS = 60;
 
     private GoogleMap mMap;
     GoogleApiClient mGoogleApiClient;
@@ -69,6 +70,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     int seconds;
     String display;
     TextView tv;
+    private ArrayList<String> blacklist;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -93,6 +95,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         clock = new Timer();
         tv = findViewById(R.id.clock);
         seconds = CLOCK_SECONDS;
+        blacklist = new ArrayList<>();
     }
 
 
@@ -174,12 +177,16 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         //move map camera
         mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
-        mMap.animateCamera(CameraUpdateFactory.zoomTo(11));
+        mMap.animateCamera(CameraUpdateFactory.zoomTo(19));
 
         //stop location updates
         //if (mGoogleApiClient != null) {
         //    LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, this);
         //}
+        checkPlace();
+    }
+
+    void checkPlace() {
         try {
             Task<PlaceLikelihoodBufferResponse> placeResult = mPlaceDetectionClient.getCurrentPlace(null);
             Task<PlaceLikelihoodBufferResponse> placeLikelihoodBufferResponseTask = placeResult.addOnCompleteListener(new OnCompleteListener<PlaceLikelihoodBufferResponse>() {
@@ -187,17 +194,16 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 public void onComplete(@NonNull Task<PlaceLikelihoodBufferResponse> task) {
                     PlaceLikelihoodBufferResponse likelyPlaces = task.getResult();
                     for (PlaceLikelihood placeLikelihood : likelyPlaces) {
-
                         Place p = placeLikelihood.getPlace();
                         List<Integer> types = p.getPlaceTypes();
                         float j = 0;
                         for (Integer i : types) {
                             if (i == Place.TYPE_BAR || i == Place.TYPE_LIQUOR_STORE) {
                                 Log.i("", "bar");
-                                mMap.addMarker(new MarkerOptions().position(p.getLatLng()).title((String) p.getName()));
-                                String id = "";
-                                if (current != null) id = current.getId();
-                                if (placeLikelihood.getLikelihood() > 0.5 && placeLikelihood.getLikelihood() > j && !p.getId().equals(id)) {
+                                String addy = (String) p.getAddress();
+                                String mark = p.getName() + " - " + addy.split(",")[0];
+                                mMap.addMarker(new MarkerOptions().position(p.getLatLng()).title(mark));
+                                if (placeLikelihood.getLikelihood() > j && !blacklist.contains(p.getId())) {
                                     Log.i("", p.getName() + " is the new current place");
                                     j = placeLikelihood.getLikelihood();
                                     current = p.freeze();
@@ -205,10 +211,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                                         @Override
                                         public void run() {
                                             seconds--;
-                                            display = String.format("" + seconds / 60 + ":%02d", seconds % 60);
+                                            display = String.format("" + seconds / 60 + ":%02d\n(armed)", seconds % 60);
                                             updateClock(display);
                                             if (seconds <= 0) {
-                                                seconds = CLOCK_SECONDS;
+                                                cancel();
                                                 helpReq();
                                             }
                                         }
@@ -227,7 +233,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         } catch (SecurityException e) {
             Log.i("", "Permission error.");
         }
-
     }
 
     void updateClock(final String display) {
@@ -240,8 +245,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     void helpReq() {
+        seconds = CLOCK_SECONDS;
+        display = String.format("" + seconds / 60 + ":%02d\n(disarmed)", seconds % 60);
+        updateClock(display);
         if (current == null) {
-            displayToast("SMS cancelled.");
             return;
         }
         Log.i("", "requesting help from " + current.getName());
@@ -255,28 +262,56 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                         new String[]{Manifest.permission.SEND_SMS},0);
             }
         } else {
-            SmsManager smsManager = SmsManager.getDefault();
-            ArrayList<Contact> contacts = db.selectAll();
-            for (Contact c : contacts) {
-                String phone = c.getPhone();
-                Log.i("","sending to " + phone);
-                smsManager.sendTextMessage(phone, null, getString(R.string.helpmsg), null, null);
+
+            // perform one more courtesy check
+            try {
+                Task<PlaceLikelihoodBufferResponse> placeResult = mPlaceDetectionClient.getCurrentPlace(null);
+                Task<PlaceLikelihoodBufferResponse> placeLikelihoodBufferResponseTask = placeResult.addOnCompleteListener(new OnCompleteListener<PlaceLikelihoodBufferResponse>() {
+                    @Override
+                    public void onComplete(@NonNull Task<PlaceLikelihoodBufferResponse> task) {
+                        PlaceLikelihoodBufferResponse likelyPlaces = task.getResult();
+                        for (PlaceLikelihood placeLikelihood : likelyPlaces) {
+                            if (current != null && placeLikelihood.getPlace().getId().equals(current.getId())) {
+                                blacklist.add(current.getId());
+                                SmsManager smsManager = SmsManager.getDefault();
+                                ArrayList<Contact> contacts = db.selectAll();
+                                for (Contact c : contacts) {
+                                    String phone = c.getPhone();
+                                    String msg = "I've been at " + current.getName() + " (" + current.getAddress() + ") for a while without checking in. I may be in danger of relapse.";
+                                    Log.i("","sending to " + phone);
+                                    smsManager.sendTextMessage(phone, null, msg, null, null);
+                                }
+                                displayToast("Mass SMS sent");
+                                current = null;
+                            }
+                        }
+                    }
+                });
+            } catch (SecurityException e) {
+                Log.i("", "Permission error");
             }
-            displayToast("Mass SMS sent");
         }
     }
 
     public void disarm(View v) {
+        if (current != null) {
+            blacklist.add(current.getId());
+            displayToast("SMS disabled for current place");
+        }
         current = null;
-        sec.cancel();
-        seconds = CLOCK_SECONDS;
+        if (sec != null) sec.cancel();
         helpReq();
+    }
+
+    public void contacts(View v) {
+        Intent i = new Intent(this, ContactList.class);
+        this.startActivity(i);
     }
 
     public void displayToast(final String str) {
         runOnUiThread(new Runnable() {
             public void run() {
-                Toast.makeText(MapsActivity.this, str, Toast.LENGTH_LONG).show();
+                Toast.makeText(MapsActivity.this, str, Toast.LENGTH_SHORT).show();
             }
         });
     }
